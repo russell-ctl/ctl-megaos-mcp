@@ -1,0 +1,7 @@
+{
+  "name": "ctl-megaos-mcp",
+  "description": "MegaOS MCP server providing 49 tools for Moltbot to administer Russell's WorkOS (deliverables, inbox, market signals), LifeOS (meals, music, adventure, family), and Jeeves (tasks, suggestions) via Supabase.",
+  "author": {
+    "name": "CTL"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "megaos": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.cjs"],
+    "env": {
+      "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}"
+    }
+  }
+}
