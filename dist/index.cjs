@@ -33691,6 +33691,116 @@ function registerWorkSettingsTools(server2) {
   });
 }
 
+// dist/tools/workos/contacts.js
+function registerContactTools(server2) {
+  server2.tool("list_contacts", "List contacts with optional tier filter. Returns contacts ordered by name.", {
+    tier: external_exports.enum(["inner-circle", "key", "important", "peripheral"]).optional().describe("Filter by tier")
+  }, async ({ tier }) => {
+    let query = supabase.from("contacts").select("*").order("name");
+    if (tier)
+      query = query.eq("tier", tier);
+    const { data, error: error2 } = await query;
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("add_contact", "Add a new contact. Name is required, all other fields are optional.", {
+    id: external_exports.string().optional().describe("Unique identifier. Auto-generated if omitted."),
+    name: external_exports.string().describe("Contact name"),
+    company: external_exports.string().optional().describe("Company name"),
+    role: external_exports.string().optional().describe("Job title or role"),
+    email: external_exports.string().optional().describe("Email address"),
+    phone: external_exports.string().optional().describe("Phone number"),
+    notes: external_exports.string().optional().describe("Free-form notes"),
+    tier: external_exports.enum(["inner-circle", "key", "important", "peripheral"]).optional().describe("Priority tier (default: important)"),
+    relationship_strength: external_exports.number().min(1).max(5).optional().describe("Relationship strength 1-5 (default: 3)"),
+    last_contacted: external_exports.string().optional().describe("Last contacted date (YYYY-MM-DD)"),
+    how_we_met: external_exports.string().optional().describe("How you met this person"),
+    context: external_exports.string().optional().describe("Why this person matters")
+  }, async ({ id, name, company, role, email: email2, phone, notes, tier, relationship_strength, last_contacted, how_we_met, context }) => {
+    const row = {
+      id: id ?? crypto.randomUUID(),
+      name,
+      company: company ?? null,
+      role: role ?? null,
+      email: email2 ?? null,
+      phone: phone ?? null,
+      notes: notes ?? null,
+      tier: tier ?? "important",
+      relationship_strength: relationship_strength ?? 3,
+      last_contacted: last_contacted ?? null,
+      how_we_met: how_we_met ?? null,
+      context: context ?? null,
+      created_at: (/* @__PURE__ */ new Date()).toISOString(),
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const { data, error: error2 } = await supabase.from("contacts").insert(row).select().single();
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("update_contact", "Update an existing contact by id. Only provided fields will be changed.", {
+    id: external_exports.string().describe("Contact id to update"),
+    name: external_exports.string().optional().describe("New name"),
+    company: external_exports.string().optional().describe("New company"),
+    role: external_exports.string().optional().describe("New role"),
+    email: external_exports.string().optional().describe("New email"),
+    phone: external_exports.string().optional().describe("New phone"),
+    notes: external_exports.string().optional().describe("New notes"),
+    tier: external_exports.enum(["inner-circle", "key", "important", "peripheral"]).optional().describe("New tier"),
+    relationship_strength: external_exports.number().min(1).max(5).optional().describe("New relationship strength"),
+    last_contacted: external_exports.string().optional().describe("New last contacted date"),
+    how_we_met: external_exports.string().optional().describe("New how we met"),
+    context: external_exports.string().optional().describe("New context")
+  }, async ({ id, name, company, role, email: email2, phone, notes, tier, relationship_strength, last_contacted, how_we_met, context }) => {
+    const updates = { updated_at: (/* @__PURE__ */ new Date()).toISOString() };
+    if (name !== void 0)
+      updates.name = name;
+    if (company !== void 0)
+      updates.company = company;
+    if (role !== void 0)
+      updates.role = role;
+    if (email2 !== void 0)
+      updates.email = email2;
+    if (phone !== void 0)
+      updates.phone = phone;
+    if (notes !== void 0)
+      updates.notes = notes;
+    if (tier !== void 0)
+      updates.tier = tier;
+    if (relationship_strength !== void 0)
+      updates.relationship_strength = relationship_strength;
+    if (last_contacted !== void 0)
+      updates.last_contacted = last_contacted;
+    if (how_we_met !== void 0)
+      updates.how_we_met = how_we_met;
+    if (context !== void 0)
+      updates.context = context;
+    const { data, error: error2 } = await supabase.from("contacts").update(updates).eq("id", id).select().single();
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    if (!data) {
+      return { content: [{ type: "text", text: `Error: Contact with id "${id}" not found` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("delete_contact", "Delete a contact by id.", {
+    id: external_exports.string().describe("Contact id to delete")
+  }, async ({ id }) => {
+    const { error: error2, count } = await supabase.from("contacts").delete({ count: "exact" }).eq("id", id);
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    if (count === 0) {
+      return { content: [{ type: "text", text: `Error: Contact with id "${id}" not found` }] };
+    }
+    return { content: [{ type: "text", text: `Deleted contact "${id}"` }] };
+  });
+}
+
 // dist/tools/lifeos/family.js
 function registerFamilyTools(server2) {
   server2.tool("get_family_profiles", "Get all family member profiles with their dietary and other constraints.", {}, async () => {
@@ -34306,13 +34416,213 @@ function registerLifeOSSettingsTools(server2) {
   });
 }
 
+// dist/tools/lifeos/admin.js
+var CATEGORIES = ["vehicle", "insurance", "subscription", "medical", "document", "tax"];
+var FREQUENCIES = ["monthly", "quarterly", "biannual", "annual", "2-year", "5-year", "10-year"];
+var FREQUENCY_MONTHS = {
+  "monthly": 1,
+  "quarterly": 3,
+  "biannual": 6,
+  "annual": 12,
+  "2-year": 24,
+  "5-year": 60,
+  "10-year": 120
+};
+function annualiseCost(cost, frequency) {
+  const months = FREQUENCY_MONTHS[frequency] ?? 12;
+  return cost / months * 12;
+}
+function advanceNextDate(currentNextDate, frequency) {
+  const date3 = new Date(currentNextDate);
+  const months = FREQUENCY_MONTHS[frequency] ?? 12;
+  date3.setMonth(date3.getMonth() + months);
+  return date3.toISOString().split("T")[0];
+}
+function registerAdminTools(server2) {
+  server2.tool("list_admin_items", "List life admin items. Optionally filter by category, completed status, or status (overdue/due-soon/upcoming).", {
+    category: external_exports.enum(CATEGORIES).optional().describe("Filter by category"),
+    completed: external_exports.boolean().optional().describe("Filter by completed status"),
+    status: external_exports.enum(["overdue", "due-soon", "upcoming"]).optional().describe("Filter by computed status (overdue, due-soon within 30 days, upcoming)")
+  }, async ({ category, completed, status }) => {
+    let query = supabase.from("admin_items").select("*").order("next_date");
+    if (category)
+      query = query.eq("category", category);
+    if (completed !== void 0)
+      query = query.eq("completed", completed);
+    const { data, error: error2 } = await query;
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    let items = data ?? [];
+    if (status) {
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      items = items.filter((item) => {
+        if (item.completed)
+          return false;
+        const next = new Date(item.next_date);
+        next.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((next.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
+        if (status === "overdue")
+          return diffDays < 0;
+        if (status === "due-soon")
+          return diffDays >= 0 && diffDays <= 30;
+        return diffDays > 30;
+      });
+    }
+    return { content: [{ type: "text", text: JSON.stringify(items, null, 2) }] };
+  });
+  server2.tool("create_admin_item", "Create a new life admin item (e.g. insurance renewal, MOT, subscription).", {
+    id: external_exports.string().optional().describe("Unique identifier. Auto-generated if omitted."),
+    title: external_exports.string().describe("Item title"),
+    category: external_exports.enum(CATEGORIES).describe("Category"),
+    frequency: external_exports.enum(FREQUENCIES).describe("How often this recurs"),
+    last_date: external_exports.string().describe("Last completed date (YYYY-MM-DD)"),
+    next_date: external_exports.string().describe("Next due date (YYYY-MM-DD)"),
+    cost: external_exports.number().optional().describe("Cost per occurrence in GBP"),
+    provider: external_exports.string().optional().describe("Service provider name"),
+    notes: external_exports.string().optional().describe("Additional notes")
+  }, async ({ id, title, category, frequency, last_date, next_date, cost, provider, notes }) => {
+    const row = {
+      id: id ?? `adm-${crypto.randomUUID().slice(0, 8)}`,
+      title,
+      category,
+      frequency,
+      last_date,
+      next_date,
+      cost: cost ?? null,
+      provider: provider ?? null,
+      notes: notes ?? null,
+      completed: false
+    };
+    const { data, error: error2 } = await supabase.from("admin_items").insert(row).select().single();
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("update_admin_item", "Update an existing admin item by id. Only provided fields will be changed.", {
+    id: external_exports.string().describe("Admin item id to update"),
+    title: external_exports.string().optional().describe("New title"),
+    category: external_exports.enum(CATEGORIES).optional().describe("New category"),
+    frequency: external_exports.enum(FREQUENCIES).optional().describe("New frequency"),
+    last_date: external_exports.string().optional().describe("New last date (YYYY-MM-DD)"),
+    next_date: external_exports.string().optional().describe("New next date (YYYY-MM-DD)"),
+    cost: external_exports.number().optional().describe("New cost in GBP"),
+    provider: external_exports.string().optional().describe("New provider"),
+    notes: external_exports.string().optional().describe("New notes"),
+    completed: external_exports.boolean().optional().describe("Set completed status")
+  }, async ({ id, title, category, frequency, last_date, next_date, cost, provider, notes, completed }) => {
+    const updates = {};
+    if (title !== void 0)
+      updates.title = title;
+    if (category !== void 0)
+      updates.category = category;
+    if (frequency !== void 0)
+      updates.frequency = frequency;
+    if (last_date !== void 0)
+      updates.last_date = last_date;
+    if (next_date !== void 0)
+      updates.next_date = next_date;
+    if (cost !== void 0)
+      updates.cost = cost;
+    if (provider !== void 0)
+      updates.provider = provider;
+    if (notes !== void 0)
+      updates.notes = notes;
+    if (completed !== void 0)
+      updates.completed = completed;
+    const { data, error: error2 } = await supabase.from("admin_items").update(updates).eq("id", id).select().single();
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    if (!data) {
+      return { content: [{ type: "text", text: `Error: Admin item "${id}" not found` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("mark_admin_item_done", "Mark an admin item as completed. Advances last_date to current next_date and calculates the new next_date based on frequency.", {
+    id: external_exports.string().describe("Admin item id to mark done")
+  }, async ({ id }) => {
+    const { data: item, error: fetchError } = await supabase.from("admin_items").select("*").eq("id", id).single();
+    if (fetchError) {
+      return { content: [{ type: "text", text: `Error: ${fetchError.message}` }] };
+    }
+    if (!item) {
+      return { content: [{ type: "text", text: `Error: Admin item "${id}" not found` }] };
+    }
+    const newNextDate = advanceNextDate(item.next_date, item.frequency);
+    const { data, error: error2 } = await supabase.from("admin_items").update({
+      completed: true,
+      last_date: item.next_date,
+      next_date: newNextDate
+    }).eq("id", id).select().single();
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+  });
+  server2.tool("delete_admin_item", "Delete a life admin item by id.", {
+    id: external_exports.string().describe("Admin item id to delete")
+  }, async ({ id }) => {
+    const { error: error2 } = await supabase.from("admin_items").delete().eq("id", id);
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    return { content: [{ type: "text", text: `Deleted admin item "${id}"` }] };
+  });
+  server2.tool("get_admin_summary", "Get a summary of all life admin items: counts by status (overdue, due-soon, upcoming, completed) and annual cost breakdown by category.", {}, async () => {
+    const { data, error: error2 } = await supabase.from("admin_items").select("*");
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    const items = data ?? [];
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    const counts = { overdue: 0, "due-soon": 0, upcoming: 0, completed: 0 };
+    for (const item of items) {
+      if (item.completed) {
+        counts.completed++;
+        continue;
+      }
+      const next = new Date(item.next_date);
+      next.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((next.getTime() - today.getTime()) / (1e3 * 60 * 60 * 24));
+      if (diffDays < 0)
+        counts.overdue++;
+      else if (diffDays <= 30)
+        counts["due-soon"]++;
+      else
+        counts.upcoming++;
+    }
+    const costByCategory = {};
+    let totalAnnualCost = 0;
+    for (const item of items) {
+      const cost = item.cost ?? 0;
+      if (cost === 0)
+        continue;
+      const annual = annualiseCost(cost, item.frequency);
+      costByCategory[item.category] = (costByCategory[item.category] ?? 0) + annual;
+      totalAnnualCost += annual;
+    }
+    const summary = {
+      total_items: items.length,
+      status_counts: counts,
+      annual_cost_by_category: costByCategory,
+      total_annual_cost: Math.round(totalAnnualCost * 100) / 100
+    };
+    return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+  });
+}
+
 // dist/tools/jeeves/tasks.js
 function registerJeevesTaskTools(server2) {
-  server2.tool("list_jeeves_tasks", "List Jeeves tasks with optional filters by status, priority, and owner. Returns tasks ordered by created_at descending.", {
+  server2.tool("list_jeeves_tasks", "List Jeeves tasks with optional filters by status, priority, owner, and deliverable. Returns tasks ordered by created_at descending.", {
     status: external_exports.enum(["inbox", "planned", "in_progress", "blocked", "done"]).optional().describe("Filter by task status"),
     priority: external_exports.enum(["critical", "high", "medium", "low"]).optional().describe("Filter by priority"),
-    owner: external_exports.enum(["russell", "jeeves"]).optional().describe("Filter by task owner")
-  }, async ({ status, priority, owner }) => {
+    owner: external_exports.enum(["russell", "jeeves"]).optional().describe("Filter by task owner"),
+    deliverable_id: external_exports.string().optional().describe("Filter by linked deliverable ID")
+  }, async ({ status, priority, owner, deliverable_id }) => {
     let query = supabase.from("jeeves_tasks").select("*").order("created_at", { ascending: false });
     if (status)
       query = query.eq("status", status);
@@ -34320,6 +34630,8 @@ function registerJeevesTaskTools(server2) {
       query = query.eq("priority", priority);
     if (owner)
       query = query.eq("owner", owner);
+    if (deliverable_id)
+      query = query.eq("deliverable_id", deliverable_id);
     const { data, error: error2 } = await query;
     if (error2) {
       return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
@@ -34334,8 +34646,9 @@ function registerJeevesTaskTools(server2) {
     priority: external_exports.enum(["critical", "high", "medium", "low"]).describe("Priority level"),
     owner: external_exports.enum(["russell", "jeeves"]).describe("Task owner"),
     due_date: external_exports.string().optional().describe("Due date in YYYY-MM-DD format"),
-    tags: external_exports.array(external_exports.string()).optional().describe("Tags for the task")
-  }, async ({ id, title, description, status, priority, owner, due_date, tags }) => {
+    tags: external_exports.array(external_exports.string()).optional().describe("Tags for the task"),
+    deliverable_id: external_exports.string().optional().describe("ID of linked deliverable")
+  }, async ({ id, title, description, status, priority, owner, due_date, tags, deliverable_id }) => {
     const row = {
       id: id ?? crypto.randomUUID(),
       title,
@@ -34344,6 +34657,7 @@ function registerJeevesTaskTools(server2) {
       priority,
       owner,
       due_date: due_date ?? null,
+      deliverable_id: deliverable_id ?? null,
       tags: tags ?? [],
       created_at: (/* @__PURE__ */ new Date()).toISOString(),
       updated_at: (/* @__PURE__ */ new Date()).toISOString()
@@ -34362,8 +34676,9 @@ function registerJeevesTaskTools(server2) {
     priority: external_exports.enum(["critical", "high", "medium", "low"]).optional().describe("New priority"),
     owner: external_exports.enum(["russell", "jeeves"]).optional().describe("New owner"),
     due_date: external_exports.string().optional().describe("New due date in YYYY-MM-DD format"),
-    tags: external_exports.array(external_exports.string()).optional().describe("New tags")
-  }, async ({ id, title, description, status, priority, owner, due_date, tags }) => {
+    tags: external_exports.array(external_exports.string()).optional().describe("New tags"),
+    deliverable_id: external_exports.string().nullable().optional().describe("ID of linked deliverable (null to unlink)")
+  }, async ({ id, title, description, status, priority, owner, due_date, tags, deliverable_id }) => {
     const updates = { updated_at: (/* @__PURE__ */ new Date()).toISOString() };
     if (title !== void 0)
       updates.title = title;
@@ -34379,6 +34694,8 @@ function registerJeevesTaskTools(server2) {
       updates.due_date = due_date;
     if (tags !== void 0)
       updates.tags = tags;
+    if (deliverable_id !== void 0)
+      updates.deliverable_id = deliverable_id;
     const { data, error: error2 } = await supabase.from("jeeves_tasks").update(updates).eq("id", id).select().single();
     if (error2) {
       return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
@@ -34399,6 +34716,24 @@ function registerJeevesTaskTools(server2) {
       return { content: [{ type: "text", text: `Error: Task with id "${id}" not found` }] };
     }
     return { content: [{ type: "text", text: `Deleted task "${id}"` }] };
+  });
+  server2.tool("list_tasks_by_deliverable", "List all tasks linked to a specific deliverable, with progress summary.", {
+    deliverable_id: external_exports.string().describe("Deliverable ID to get tasks for")
+  }, async ({ deliverable_id }) => {
+    const { data, error: error2 } = await supabase.from("jeeves_tasks").select("*").eq("deliverable_id", deliverable_id).order("priority");
+    if (error2) {
+      return { content: [{ type: "text", text: `Error: ${error2.message}` }] };
+    }
+    const total = data?.length ?? 0;
+    const done = data?.filter((t) => t.status === "done").length ?? 0;
+    const result = {
+      deliverable_id,
+      total_tasks: total,
+      done_tasks: done,
+      progress_percent: total > 0 ? Math.round(done / total * 100) : 0,
+      tasks: data
+    };
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   });
 }
 
@@ -34555,6 +34890,7 @@ registerInboxTools(server);
 registerMarketTools(server);
 registerTimeWindowTools(server);
 registerWorkSettingsTools(server);
+registerContactTools(server);
 registerFamilyTools(server);
 registerMealTools(server);
 registerFeedbackTools(server);
@@ -34563,6 +34899,7 @@ registerAdventureTools(server);
 registerActivityTools(server);
 registerAccommodationTools(server);
 registerLifeOSSettingsTools(server);
+registerAdminTools(server);
 registerJeevesTaskTools(server);
 registerJeevesSuggestionTools(server);
 registerJeevesSettingsTools(server);
